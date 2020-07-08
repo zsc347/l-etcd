@@ -7,6 +7,11 @@ import (
 )
 
 const (
+	minSectorSize  = 512
+	frameSizeBytes = 8
+)
+
+const (
 	metadataType int64 = iota + 1
 	entryType
 	stateType

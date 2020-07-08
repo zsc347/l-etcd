@@ -13,9 +13,6 @@ import (
 	"go.etcd.io/etcd/wal/walpb"
 )
 
-const minSectorSize = 512
-const frameSizeBytes = 8
-
 type decoder struct {
 	mu           sync.Mutex
 	brs          []*bufio.Reader
