@@ -29,5 +29,6 @@ var (
 
 // Error definitions for wal
 var (
+	ErrFileNotFound                 = errors.New("wal: file not found")
 	ErrMaxWALEntrySizeLimitExceeded = errors.New("wal: max entry size limit exceeded")
 )
