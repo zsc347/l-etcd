@@ -7,8 +7,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/l-edcd/pkg/ioutil"
 	"go.etcd.io/etcd/pkg/crc"
-	"go.etcd.io/etcd/pkg/ioutil"
 	"go.etcd.io/etcd/wal/walpb"
 )
 
