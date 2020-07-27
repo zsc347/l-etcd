@@ -16,7 +16,7 @@ var safeRangeBucket = []byte("key")
 // ReadTx hold read transtion
 type ReadTx interface {
 	Lock()
-	UnLock()
+	Unlock()
 	RLock()
 	RUnlock()
 
@@ -131,7 +131,7 @@ type readTx struct {
 }
 
 func (rt *readTx) Lock()    { rt.mu.Lock() }
-func (rt *readTx) UnLock()  { rt.mu.Unlock() }
+func (rt *readTx) Unlock()  { rt.mu.Unlock() }
 func (rt *readTx) RLock()   { rt.mu.RLock() }
 func (rt *readTx) RUnlock() { rt.mu.RUnlock() }
 
@@ -147,6 +147,6 @@ type concurrentReadTx struct {
 }
 
 func (rt *concurrentReadTx) Lock()    {}
-func (rt *concurrentReadTx) UnLock()  {}
+func (rt *concurrentReadTx) Unlock()  {}
 func (rt *concurrentReadTx) RLock()   {}
 func (rt *concurrentReadTx) RUnlock() { rt.txWg.Done() }

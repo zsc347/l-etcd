@@ -258,7 +258,7 @@ func (t *batchTxBuffered) Unlock() {
 	if t.pending != 0 {
 		t.backend.readTx.Lock() // blocks txReadBuffer for writing.
 		t.buf.writeback(&t.backend.readTx.buf)
-		t.backend.readTx.UnLock()
+		t.backend.readTx.Unlock()
 		if t.pending >= t.backend.batchLimit {
 			t.commit(false)
 		}
@@ -282,7 +282,7 @@ func (t *batchTxBuffered) commit(stop bool) {
 	// all read txs must be closed to acquire boltdb commit rwlock
 	t.backend.readTx.Lock()
 	t.unsafeCommit(stop)
-	t.backend.readTx.UnLock()
+	t.backend.readTx.Unlock()
 }
 
 func (t *batchTxBuffered) unsafeCommit(stop bool) {
