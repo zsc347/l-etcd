@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"fmt"
+	"hash/crc32"
 	"io"
 	"io/ioutil"
 	"os"
@@ -182,8 +184,7 @@ func newBackend(bcfg BackendConfig) *backend {
 
 	b.batchTx = newBatchTxBuffered(b)
 
-	// TODO
-	// go b.run()
+	go b.run()
 	return b
 }
 
@@ -278,6 +279,225 @@ func (b *backend) Snapshot() Snapshot {
 type IgnoreKey struct {
 	Bucket string
 	Key    string
+}
+
+func (b *backend) Hash(ignores map[IgnoreKey]struct{}) (uint32, error) {
+	h := crc32.New(crc32.MakeTable(crc32.Castagnoli))
+
+	b.mu.RLock()
+	defer b.mu.Unlock()
+
+	err := b.db.View(func(tx *bolt.Tx) error {
+		c := tx.Cursor()
+		for next, _ := c.First(); next != nil; next, _ = c.Next() {
+			b := tx.Bucket(next)
+			if b == nil {
+				return fmt.Errorf("cannot get hash of bucket %s", string(next))
+			}
+			h.Write(next)
+			b.ForEach(func(k, v []byte) error {
+				bk := IgnoreKey{Bucket: string(next), Key: string(k)}
+				if _, ok := ignores[bk]; !ok {
+					h.Write(k)
+					h.Write(v)
+				}
+				return nil
+			})
+		}
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return h.Sum32(), nil
+}
+
+func (b *backend) Size() int64 {
+	return atomic.LoadInt64(&b.size)
+}
+
+func (b *backend) SizeInUse() int64 {
+	return atomic.LoadInt64(&b.sizeInUse)
+}
+
+func (b *backend) run() {
+	defer close(b.donec)
+	t := time.NewTimer(b.batchIntervel)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-t.C:
+		case <-b.stopc:
+			b.batchTx.CommitAndStop()
+			return
+		}
+		if b.batchTx.safePending() != 0 {
+			b.batchTx.Commit()
+		}
+		t.Reset(b.batchIntervel)
+	}
+}
+
+func (b *backend) Close() error {
+	close(b.stopc)
+	<-b.donec
+	return b.db.Close()
+}
+
+// Commits returns total number of commits since start
+func (b *backend) Commits() int64 {
+	return atomic.LoadInt64(&b.commits)
+}
+
+func (b *backend) Defrag() error {
+	return b.defrag()
+}
+
+func (b *backend) defrag() error {
+	now := time.Now()
+
+	// TODO: make this non-blocking ?
+	// lock batchTx to ensure nobody is using previous tx, and then
+	// close previous ongoing tx.
+
+	b.batchTx.Lock()
+	defer b.batchTx.Unlock()
+
+	// lock database after lock tx to avoid deadlock
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// block concurrent read requests while resetting tx
+	b.readTx.Lock()
+	defer b.readTx.Unlock()
+
+	b.batchTx.unsafeCommit(true)
+	b.batchTx.tx = nil
+
+	// Create a temporary file to ensure we start with a clean state.
+	// Snapshotter.cleanupSnapdir cleans up any of these taht are found during startup.
+	dir := filepath.Dir(b.db.Path())
+	temp, err := ioutil.TempFile(dir, "db.tmp.*")
+	if err != nil {
+		return err
+	}
+	options := bolt.Options{}
+	if boltOpenOptions != nil {
+		options = *boltOpenOptions
+	}
+
+	options.OpenFile = func(path string,
+		i int,
+		mode os.FileMode) (file *os.File, err error) {
+		return temp, nil
+	}
+
+	tdbp := temp.Name()
+	tmpdb, err := bolt.Open(tdbp, 0600, &options)
+	if err != nil {
+		return err
+	}
+
+	dbp := b.db.Path()
+	size1, sizeInUse1 := b.Size(), b.SizeInUse()
+	if b.lg != nil {
+		b.lg.Info(
+			"degragmenting",
+			zap.String("path", dbp),
+			zap.Int64("current-db-size-bytes", size1),
+			zap.String("current-db-size", humanize.Bytes(uint64(size1))),
+			zap.Int64("currrent-db-size-in-use-bytes", sizeInUse1),
+			zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse1))),
+		)
+	}
+
+	// gofail: var defragBeforeCopy struct{}
+	err = defragdb(b.db, tmpdb, defragLimit)
+	if err != nil {
+		tmpdb.Close()
+		if rmErr := os.RemoveAll(tmpdb.Path()); rmErr != nil {
+			b.lg.Error("failed to remove db.tmp after defragmentation completed",
+				zap.Error(rmErr))
+		}
+		return err
+	}
+
+	err = b.db.Close()
+	if err != nil {
+		b.lg.Fatal("failed to close database", zap.Error(err))
+	}
+
+	err = tmpdb.Close()
+	if err != nil {
+		b.lg.Fatal("failed to close tmp database", zap.Error(err))
+	}
+
+	// gofail: var defragBeforeRename struct{}
+	err = os.Rename(tdbp, dbp)
+	if err != nil {
+		b.lg.Fatal("failed to rename tmp database", zap.Error(err))
+	}
+
+	b.db, err = bolt.Open(dbp, 0600, boltOpenOptions)
+	if err != nil {
+		b.lg.Fatal("failed to open database",
+			zap.String("path", dbp),
+			zap.Error(err))
+	}
+
+	b.batchTx.tx = b.unsafeBegin(true)
+
+	b.readTx.reset()
+	b.readTx.tx = b.unsafeBegin(false)
+
+	size := b.readTx.tx.Size()
+	db := b.readTx.tx.DB()
+	atomic.StoreInt64(&b.size, size)
+	atomic.StoreInt64(&b.sizeInUse, size-(int64(db.Stats().FreePageN)*int64(db.Info().PageSize)))
+
+	took := time.Since(now)
+	defragSec.Observe(took.Seconds())
+
+
+	size2, sizeInUse2 := b.Size(), b.SizeInUse()
+	if b.lg != nil {
+		if b.lg != nil {
+			b.lg.Info(
+				"degragmented",
+				zap.String("path", dbp),
+				zap.Int64("current-db-size-bytes-diff", size2 - size1)
+				zap.Int64("current-db-size-bytes", size1),
+				zap.String("current-db-size", humanize.Bytes(uint64(size1))),
+				zap.Int64("currrent-db-size-in-use-bytes", sizeInUse1),
+				zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse1))),
+				zap.Duration("took", took)
+			)
+		}
+	}
+	return nil
+}
+
+func defragdb(odb, tmpdb *bolt.DB, limit int) error {
+	// open a tx on tmpdb for writes
+	tmptx, err := tmpdb.Begin(true)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tmptx.Rollback()
+		}
+	}()
+
+	// TODO
+
+
+
+	return nil
 }
 
 func (b *backend) begin(write bool) *bolt.Tx {
