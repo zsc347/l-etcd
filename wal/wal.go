@@ -14,7 +14,7 @@ import (
 
 	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/raft/raftpb"
-	"github.com/l-edcd/pkg/fileutil"
+	"github.com/l-etcd/pkg/fileutil"
 	"go.etcd.io/etcd/pkg/pbutil"
 	"go.etcd.io/etcd/wal/walpb"
 	"go.uber.org/zap"

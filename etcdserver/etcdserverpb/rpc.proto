@@ -1,0 +1,43 @@
+syntax = "proto3";
+package etcdserverpb;
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+
+
+message ResponseHeader {
+    // cluster_id is the ID of the cluster which sent the response.
+    uint64 cluster_id = 1;
+    // member_id is the ID of the member which sent the response.
+    uint64 member_id = 2;
+    // revision is the key-value store revision when the request was applied.
+    // For watch progress responses, the header.revision indicates progress.
+    // All future events received in this stream are guaranteed to have a 
+    // higner revision number than the header.revision number
+    int64 revision = 3;
+    // raft_term is the raft term when the request was applied.
+    uint64 raft_term = 4;
+}
+
+message LeaseTimeToLiveRequest {
+    // ID is the lease ID for the lease.
+    int64 ID = 1;
+    // keys is true to query all the keys attached to this lease.
+    bool keys = 2;
+}
+
+message LeaseTimeToLiveResponse {
+    ResponseHeader header = 1;
+    // ID is the lease ID from the keep alive request.
+    int64 ID = 2;
+    // TTL is the remaining TTL in seconds for the lease;
+    // the lease will expire in under TTL+1 seconds.
+    int64 TTL = 3;
+    // GrantedTTL is the initial granted time in seconds upon lease 
+    // creation/renewal.
+    int64 grantedTTL = 4;
+    // Keys is the list of keys attached to this lease.
+    repeated bytes keys = 5;
+}

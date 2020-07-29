@@ -105,6 +105,7 @@ type backend struct {
 	lg *zap.Logger
 }
 
+// BackendConfig set up backend config
 type BackendConfig struct {
 	// Path is the file path to the backend file.
 	Path string
@@ -461,19 +462,19 @@ func (b *backend) defrag() error {
 	took := time.Since(now)
 	defragSec.Observe(took.Seconds())
 
-
 	size2, sizeInUse2 := b.Size(), b.SizeInUse()
 	if b.lg != nil {
 		if b.lg != nil {
 			b.lg.Info(
 				"degragmented",
 				zap.String("path", dbp),
-				zap.Int64("current-db-size-bytes-diff", size2 - size1)
+				zap.Int64("current-db-size-bytes-diff", size2-size1),
 				zap.Int64("current-db-size-bytes", size1),
 				zap.String("current-db-size", humanize.Bytes(uint64(size1))),
-				zap.Int64("currrent-db-size-in-use-bytes", sizeInUse1),
-				zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse1))),
-				zap.Duration("took", took)
+				zap.Int64("current-db-size-in-use-bytes-diff", sizeInUse2-sizeInUse1),
+				zap.Int64("currrent-db-size-in-use-bytes", sizeInUse2),
+				zap.String("current-db-size-in-use", humanize.Bytes(uint64(sizeInUse2))),
+				zap.Duration("took", took),
 			)
 		}
 	}
@@ -493,11 +494,51 @@ func defragdb(odb, tmpdb *bolt.DB, limit int) error {
 		}
 	}()
 
-	// TODO
+	// open a tx on old db for read
+	tx, err := odb.Begin(false)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 
+	c := tx.Cursor()
 
+	count := 0
+	for next, _ := c.First(); next != nil; next, _ = c.Next() {
+		b := tx.Bucket(next)
+		if b == nil {
+			return fmt.Errorf("backend: cannot defrag bucket %s", string(next))
+		}
 
-	return nil
+		tmpb, berr := tmptx.CreateBucketIfNotExists(next)
+		if berr != nil {
+			return berr
+		}
+		tmpb.FillPercent = 0.9
+
+		if err = b.ForEach(func(k, v []byte) error {
+			count++
+			if count > limit {
+				err = tmptx.Commit()
+				if err != nil {
+					return err
+				}
+				tmptx, err = tmpdb.Begin(true)
+				if err != nil {
+					return err
+				}
+				tmpb = tmptx.Bucket(next)
+				tmpb.FillPercent = 0.9
+				count = 0
+			}
+
+			return tmpb.Put(k, v)
+		}); err != nil {
+			return err
+		}
+	}
+
+	return tmptx.Commit()
 }
 
 func (b *backend) begin(write bool) *bolt.Tx {

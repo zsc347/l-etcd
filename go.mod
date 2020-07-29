@@ -1,4 +1,4 @@
-module github.com/l-edcd
+module github.com/l-etcd
 
 go 1.14
 
