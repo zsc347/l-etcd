@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/l-edcd/pkg/fileutil"
+	"github.com/l-etcd/pkg/fileutil"
 	"go.etcd.io/etcd/wal/walpb"
 	"go.uber.org/zap"
 )

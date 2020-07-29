@@ -3,6 +3,8 @@ package etcdserverpb;
 
 import "gogoproto/gogo.proto";
 
+option go_package = "github.com/l-etcd/etcdserver/etcdserverpb";
+
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.unmarshaler_all) = true;
 

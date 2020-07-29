@@ -4,6 +4,8 @@ package leasepb;
 import "gogoproto/gogo.proto";
 import "etcdserver/etcdserverpb/rpc.proto";
 
+option go_package = "github.com/l-etcd/lease/leasepb";
+
 option (gogoproto.marshaler_all) = true;
 option (gogoproto.sizer_all) = true;
 option (gogoproto.unmarshaler_all) = true;

@@ -9,4 +9,5 @@
 
 protoc --gofast_out=plugins=grpc:. \
   --proto_path=$GOPATH/src:$GOPATH/pkg/mod/github.com/gogo/protobuf@v1.3.1:. \
+  --go_out=./ \
   *.proto;
