@@ -243,36 +243,196 @@ func (m *LeaseTimeToLiveResponse) GetKeys() [][]byte {
 	return nil
 }
 
+type LeaseCheckpoint struct {
+	// ID is the lease ID to checkpoint.
+	ID int64 `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	// Remaining_TTL is the remaining time until expiry of the lease.
+	Remaining_TTL        int64    `protobuf:"varint,2,opt,name=remaining_TTL,json=remainingTTL,proto3" json:"remaining_TTL,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *LeaseCheckpoint) Reset()         { *m = LeaseCheckpoint{} }
+func (m *LeaseCheckpoint) String() string { return proto.CompactTextString(m) }
+func (*LeaseCheckpoint) ProtoMessage()    {}
+func (*LeaseCheckpoint) Descriptor() ([]byte, []int) {
+	return fileDescriptor_77a6da22d6a3feb1, []int{3}
+}
+func (m *LeaseCheckpoint) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *LeaseCheckpoint) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_LeaseCheckpoint.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *LeaseCheckpoint) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaseCheckpoint.Merge(m, src)
+}
+func (m *LeaseCheckpoint) XXX_Size() int {
+	return m.Size()
+}
+func (m *LeaseCheckpoint) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaseCheckpoint.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_LeaseCheckpoint proto.InternalMessageInfo
+
+func (m *LeaseCheckpoint) GetID() int64 {
+	if m != nil {
+		return m.ID
+	}
+	return 0
+}
+
+func (m *LeaseCheckpoint) GetRemaining_TTL() int64 {
+	if m != nil {
+		return m.Remaining_TTL
+	}
+	return 0
+}
+
+type LeaseCheckpointRequest struct {
+	Checkpoints          []*LeaseCheckpoint `protobuf:"bytes,1,rep,name=checkpoints,proto3" json:"checkpoints,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}           `json:"-"`
+	XXX_unrecognized     []byte             `json:"-"`
+	XXX_sizecache        int32              `json:"-"`
+}
+
+func (m *LeaseCheckpointRequest) Reset()         { *m = LeaseCheckpointRequest{} }
+func (m *LeaseCheckpointRequest) String() string { return proto.CompactTextString(m) }
+func (*LeaseCheckpointRequest) ProtoMessage()    {}
+func (*LeaseCheckpointRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_77a6da22d6a3feb1, []int{4}
+}
+func (m *LeaseCheckpointRequest) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *LeaseCheckpointRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_LeaseCheckpointRequest.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *LeaseCheckpointRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaseCheckpointRequest.Merge(m, src)
+}
+func (m *LeaseCheckpointRequest) XXX_Size() int {
+	return m.Size()
+}
+func (m *LeaseCheckpointRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaseCheckpointRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_LeaseCheckpointRequest proto.InternalMessageInfo
+
+func (m *LeaseCheckpointRequest) GetCheckpoints() []*LeaseCheckpoint {
+	if m != nil {
+		return m.Checkpoints
+	}
+	return nil
+}
+
+type LeaseCheckpointResponse struct {
+	Header               *ResponseHeader `protobuf:"bytes,1,opt,name=header,proto3" json:"header,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
+}
+
+func (m *LeaseCheckpointResponse) Reset()         { *m = LeaseCheckpointResponse{} }
+func (m *LeaseCheckpointResponse) String() string { return proto.CompactTextString(m) }
+func (*LeaseCheckpointResponse) ProtoMessage()    {}
+func (*LeaseCheckpointResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_77a6da22d6a3feb1, []int{5}
+}
+func (m *LeaseCheckpointResponse) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *LeaseCheckpointResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_LeaseCheckpointResponse.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *LeaseCheckpointResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LeaseCheckpointResponse.Merge(m, src)
+}
+func (m *LeaseCheckpointResponse) XXX_Size() int {
+	return m.Size()
+}
+func (m *LeaseCheckpointResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_LeaseCheckpointResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_LeaseCheckpointResponse proto.InternalMessageInfo
+
+func (m *LeaseCheckpointResponse) GetHeader() *ResponseHeader {
+	if m != nil {
+		return m.Header
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*ResponseHeader)(nil), "etcdserverpb.ResponseHeader")
 	proto.RegisterType((*LeaseTimeToLiveRequest)(nil), "etcdserverpb.LeaseTimeToLiveRequest")
 	proto.RegisterType((*LeaseTimeToLiveResponse)(nil), "etcdserverpb.LeaseTimeToLiveResponse")
+	proto.RegisterType((*LeaseCheckpoint)(nil), "etcdserverpb.LeaseCheckpoint")
+	proto.RegisterType((*LeaseCheckpointRequest)(nil), "etcdserverpb.LeaseCheckpointRequest")
+	proto.RegisterType((*LeaseCheckpointResponse)(nil), "etcdserverpb.LeaseCheckpointResponse")
 }
 
 func init() { proto.RegisterFile("rpc.proto", fileDescriptor_77a6da22d6a3feb1) }
 
 var fileDescriptor_77a6da22d6a3feb1 = []byte{
-	// 308 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x64, 0x51, 0x41, 0x4a, 0xc3, 0x40,
-	0x14, 0x75, 0x92, 0x58, 0xda, 0x6f, 0x29, 0x65, 0x10, 0x2d, 0x55, 0x43, 0xe9, 0xaa, 0xab, 0x0a,
-	0xea, 0xd2, 0x95, 0x74, 0x61, 0x20, 0xab, 0x21, 0xfb, 0x92, 0x64, 0xbe, 0x31, 0x68, 0x32, 0x71,
-	0x66, 0x1a, 0xf0, 0x00, 0xde, 0xc1, 0x0b, 0x78, 0x17, 0x97, 0x1e, 0x41, 0xe2, 0x45, 0x24, 0x33,
-	0x21, 0x54, 0xdc, 0xfd, 0x79, 0xef, 0xbf, 0x79, 0xef, 0xcd, 0xc0, 0x48, 0x56, 0xe9, 0xba, 0x92,
-	0x42, 0x0b, 0x3a, 0x46, 0x9d, 0x72, 0x85, 0xb2, 0x46, 0x59, 0x25, 0xf3, 0xe3, 0x4c, 0x64, 0xc2,
-	0x10, 0x97, 0xed, 0x64, 0x77, 0x96, 0x6f, 0x04, 0x26, 0x0c, 0x55, 0x25, 0x4a, 0x85, 0xf7, 0x18,
-	0x73, 0x94, 0xf4, 0x02, 0x20, 0x7d, 0xde, 0x29, 0x8d, 0x72, 0x9b, 0xf3, 0x19, 0x59, 0x90, 0x95,
-	0xc7, 0x46, 0x1d, 0x12, 0x70, 0x7a, 0x06, 0xa3, 0x02, 0x8b, 0xc4, 0xb2, 0x8e, 0x61, 0x87, 0x16,
-	0x08, 0x38, 0x9d, 0xc3, 0x50, 0x62, 0x9d, 0xab, 0x5c, 0x94, 0x33, 0x77, 0x41, 0x56, 0x2e, 0xeb,
-	0xcf, 0xad, 0x50, 0xc6, 0x0f, 0x7a, 0xab, 0x51, 0x16, 0x33, 0xcf, 0x0a, 0x5b, 0x20, 0x42, 0x59,
-	0x2c, 0x6f, 0xe1, 0x24, 0xc4, 0x58, 0x61, 0x94, 0x17, 0x18, 0x89, 0x30, 0xaf, 0x91, 0xe1, 0xcb,
-	0x0e, 0x95, 0xa6, 0x13, 0x70, 0x82, 0x8d, 0x89, 0xe1, 0x32, 0x27, 0xd8, 0x50, 0x0a, 0xde, 0x13,
-	0xbe, 0x2a, 0x63, 0x3d, 0x64, 0x66, 0x5e, 0x7e, 0x10, 0x38, 0xfd, 0x27, 0xb7, 0xa5, 0xe8, 0x0d,
-	0x0c, 0x1e, 0x4d, 0x31, 0x73, 0xc7, 0xd1, 0xd5, 0xf9, 0x7a, 0xff, 0x59, 0xd6, 0x7f, 0xcb, 0xb3,
-	0x6e, 0xb7, 0x73, 0x75, 0x7a, 0xd7, 0x29, 0xb8, 0x51, 0x14, 0x76, 0x9d, 0xda, 0x91, 0xfa, 0x00,
-	0x99, 0x8c, 0x4b, 0x8d, 0xbc, 0x25, 0x3c, 0x43, 0xec, 0x21, 0x7d, 0xce, 0xc3, 0x85, 0xbb, 0x1a,
-	0xdb, 0x9c, 0x77, 0xd3, 0xcf, 0xc6, 0x27, 0x5f, 0x8d, 0x4f, 0xbe, 0x1b, 0x9f, 0xbc, 0xff, 0xf8,
-	0x07, 0xc9, 0xc0, 0x7c, 0xc3, 0xf5, 0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0xed, 0x68, 0xa7, 0x19,
-	0xb7, 0x01, 0x00, 0x00,
+	// 407 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xa4, 0x52, 0x4d, 0x8a, 0xd4, 0x40,
+	0x18, 0xb5, 0x92, 0x38, 0x74, 0x7f, 0xdd, 0x8e, 0x52, 0x88, 0x86, 0xd1, 0x09, 0x21, 0x6e, 0xe2,
+	0xc2, 0x04, 0x46, 0x77, 0x0a, 0x82, 0x0e, 0x62, 0x20, 0x20, 0x84, 0x6c, 0x74, 0xd3, 0xe4, 0xe7,
+	0x33, 0x5d, 0xcc, 0x24, 0x15, 0xab, 0xaa, 0x1b, 0x3c, 0x80, 0x77, 0xf0, 0x02, 0xde, 0xc5, 0xa5,
+	0x47, 0x90, 0xf6, 0x22, 0x92, 0x4a, 0x4c, 0xa7, 0xed, 0xe5, 0xec, 0xbe, 0xbc, 0xaf, 0xde, 0xfb,
+	0xde, 0x7b, 0x04, 0xe6, 0xa2, 0x2d, 0x82, 0x56, 0x70, 0xc5, 0xe9, 0x12, 0x55, 0x51, 0x4a, 0x14,
+	0x5b, 0x14, 0x6d, 0x7e, 0x76, 0xbf, 0xe2, 0x15, 0xd7, 0x8b, 0xb0, 0x9b, 0xfa, 0x37, 0xde, 0x37,
+	0x02, 0xa7, 0x09, 0xca, 0x96, 0x37, 0x12, 0xdf, 0x63, 0x56, 0xa2, 0xa0, 0xe7, 0x00, 0xc5, 0xf5,
+	0x46, 0x2a, 0x14, 0x2b, 0x56, 0xda, 0xc4, 0x25, 0xbe, 0x95, 0xcc, 0x07, 0x24, 0x2a, 0xe9, 0x23,
+	0x98, 0xd7, 0x58, 0xe7, 0xfd, 0xd6, 0xd0, 0xdb, 0x59, 0x0f, 0x44, 0x25, 0x3d, 0x83, 0x99, 0xc0,
+	0x2d, 0x93, 0x8c, 0x37, 0xb6, 0xe9, 0x12, 0xdf, 0x4c, 0xc6, 0xef, 0x8e, 0x28, 0xb2, 0xcf, 0x6a,
+	0xa5, 0x50, 0xd4, 0xb6, 0xd5, 0x13, 0x3b, 0x20, 0x45, 0x51, 0x7b, 0xaf, 0xe0, 0x41, 0x8c, 0x99,
+	0xc4, 0x94, 0xd5, 0x98, 0xf2, 0x98, 0x6d, 0x31, 0xc1, 0x2f, 0x1b, 0x94, 0x8a, 0x9e, 0x82, 0x11,
+	0x5d, 0x6a, 0x1b, 0x66, 0x62, 0x44, 0x97, 0x94, 0x82, 0x75, 0x85, 0x5f, 0xa5, 0x3e, 0x3d, 0x4b,
+	0xf4, 0xec, 0xfd, 0x20, 0xf0, 0xf0, 0x88, 0xde, 0x87, 0xa2, 0x2f, 0xe0, 0x64, 0xad, 0x83, 0x69,
+	0x8d, 0xc5, 0xc5, 0xe3, 0x60, 0x5a, 0x4b, 0x70, 0x18, 0x3e, 0x19, 0xde, 0x0e, 0x57, 0x8d, 0xf1,
+	0xea, 0x3d, 0x30, 0xd3, 0x34, 0x1e, 0x32, 0x75, 0x23, 0x75, 0x00, 0x2a, 0x91, 0x35, 0x0a, 0xcb,
+	0x6e, 0x61, 0xe9, 0xc5, 0x04, 0x19, 0x7d, 0xde, 0x76, 0x4d, 0x7f, 0x39, 0xf8, 0x7c, 0x07, 0x77,
+	0xb5, 0xcd, 0xb7, 0x6b, 0x2c, 0xae, 0x5a, 0xce, 0x9a, 0xe3, 0x78, 0x4f, 0xe0, 0x8e, 0xc0, 0x3a,
+	0x63, 0x0d, 0x6b, 0xaa, 0x55, 0xa7, 0xdc, 0x7b, 0x58, 0x8e, 0x60, 0x9a, 0xc6, 0xde, 0xc7, 0xa1,
+	0xad, 0xbd, 0xce, 0xbf, 0xb6, 0x5e, 0xc3, 0xa2, 0x18, 0x41, 0x69, 0x13, 0xd7, 0xf4, 0x17, 0x17,
+	0xe7, 0x87, 0x91, 0xff, 0xa7, 0x4e, 0x19, 0xde, 0x87, 0xa1, 0xc9, 0xa9, 0xf4, 0x4d, 0x9a, 0x7c,
+	0xf3, 0xf2, 0xe7, 0xce, 0x21, 0xbf, 0x76, 0x0e, 0xf9, 0xbd, 0x73, 0xc8, 0xf7, 0x3f, 0xce, 0xad,
+	0x4f, 0x4f, 0x2b, 0xa6, 0xd6, 0x9b, 0x3c, 0x28, 0x78, 0x1d, 0x5e, 0x3f, 0xeb, 0x34, 0xc2, 0xbd,
+	0x50, 0x38, 0xd5, 0xcc, 0x4f, 0xf4, 0x5f, 0xfa, 0xfc, 0x6f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00,
+	0x13, 0x0b, 0x4f, 0xd6, 0x02, 0x00, 0x00,
 }
 
 func (m *ResponseHeader) Marshal() (dAtA []byte, err error) {
@@ -427,6 +587,123 @@ func (m *LeaseTimeToLiveResponse) MarshalToSizedBuffer(dAtA []byte) (int, error)
 	return len(dAtA) - i, nil
 }
 
+func (m *LeaseCheckpoint) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *LeaseCheckpoint) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *LeaseCheckpoint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.Remaining_TTL != 0 {
+		i = encodeVarintRpc(dAtA, i, uint64(m.Remaining_TTL))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.ID != 0 {
+		i = encodeVarintRpc(dAtA, i, uint64(m.ID))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *LeaseCheckpointRequest) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *LeaseCheckpointRequest) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *LeaseCheckpointRequest) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if len(m.Checkpoints) > 0 {
+		for iNdEx := len(m.Checkpoints) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Checkpoints[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintRpc(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *LeaseCheckpointResponse) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *LeaseCheckpointResponse) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *LeaseCheckpointResponse) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
+	}
+	if m.Header != nil {
+		{
+			size, err := m.Header.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintRpc(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func encodeVarintRpc(dAtA []byte, offset int, v uint64) int {
 	offset -= sovRpc(v)
 	base := offset
@@ -504,6 +781,58 @@ func (m *LeaseTimeToLiveResponse) Size() (n int) {
 			l = len(b)
 			n += 1 + l + sovRpc(uint64(l))
 		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *LeaseCheckpoint) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.ID != 0 {
+		n += 1 + sovRpc(uint64(m.ID))
+	}
+	if m.Remaining_TTL != 0 {
+		n += 1 + sovRpc(uint64(m.Remaining_TTL))
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *LeaseCheckpointRequest) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Checkpoints) > 0 {
+		for _, e := range m.Checkpoints {
+			l = e.Size()
+			n += 1 + l + sovRpc(uint64(l))
+		}
+	}
+	if m.XXX_unrecognized != nil {
+		n += len(m.XXX_unrecognized)
+	}
+	return n
+}
+
+func (m *LeaseCheckpointResponse) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.Header != nil {
+		l = m.Header.Size()
+		n += 1 + l + sovRpc(uint64(l))
 	}
 	if m.XXX_unrecognized != nil {
 		n += len(m.XXX_unrecognized)
@@ -893,6 +1222,276 @@ func (m *LeaseTimeToLiveResponse) Unmarshal(dAtA []byte) error {
 			}
 			m.Keys = append(m.Keys, make([]byte, postIndex-iNdEx))
 			copy(m.Keys[len(m.Keys)-1], dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *LeaseCheckpoint) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: LeaseCheckpoint: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: LeaseCheckpoint: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ID", wireType)
+			}
+			m.ID = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ID |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Remaining_TTL", wireType)
+			}
+			m.Remaining_TTL = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.Remaining_TTL |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *LeaseCheckpointRequest) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: LeaseCheckpointRequest: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: LeaseCheckpointRequest: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Checkpoints", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Checkpoints = append(m.Checkpoints, &LeaseCheckpoint{})
+			if err := m.Checkpoints[len(m.Checkpoints)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipRpc(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.XXX_unrecognized = append(m.XXX_unrecognized, dAtA[iNdEx:iNdEx+skippy]...)
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *LeaseCheckpointResponse) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowRpc
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: LeaseCheckpointResponse: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: LeaseCheckpointResponse: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Header", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowRpc
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthRpc
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthRpc
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Header == nil {
+				m.Header = &ResponseHeader{}
+			}
+			if err := m.Header.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
