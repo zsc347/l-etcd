@@ -1,3 +1,3 @@
 package lease
 
-type LeaseId int64
+type LeaseID int64

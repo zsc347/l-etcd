@@ -62,7 +62,7 @@ type WriteView interface {
 	// validate the lease id.
 	// A put also increase the rev of the store, and generates one event in the event history.
 	// The returned rev is the current revision of the KV when the operation is executed.
-	Put(key, value []byte, lease lease.LeaseId) (rev int64)
+	Put(key, value []byte, lease lease.LeaseID) (rev int64)
 }
 
 type TxnWrite interface {
@@ -81,7 +81,7 @@ func (trw *txnReadWrite) DeleteRange(key, end []byte) (n, rev int64) {
 	panic("unexpected DeleteRange")
 }
 
-func (trw *txnReadWrite) Put(key, value []byte, lease lease.LeaseId) (rev int64) {
+func (trw *txnReadWrite) Put(key, value []byte, lease lease.LeaseID) (rev int64) {
 	panic("unexpected Put")
 }
 
