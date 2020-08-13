@@ -270,21 +270,6 @@ func (le *lessor) initAndRecover() {
 	le.b.ForceCommit()
 }
 
-func (le *lessor) runLoop() {
-	defer close(le.doneC)
-
-	for {
-		le.revokeExpiredLeases()
-		le.checkpointScheduledLeases()
-
-		select {
-		case <-time.After(500 * time.Millisecond):
-		case <-le.stopC:
-			return
-		}
-	}
-}
-
 // isPrimary indicates if this lessor is the primary lessor. The primary
 // lessor manages lease expration and renew.
 //
@@ -594,6 +579,108 @@ func (le *lessor) Demote() {
 	}
 }
 
+// Attach attaches items to the lease with given ID. when the lease
+// expires, the attached items will be automaticlly removed.
+// If the given lease does not exist, an error will be returned
+func (le *lessor) Attach(id LeaseID, items []LeaseItem) error {
+	le.mu.Lock()
+	defer le.mu.Unlock()
+
+	l := le.leaseMap[id]
+	if l == nil {
+		return ErrLeaseNotFound
+	}
+
+	l.mu.Lock()
+	for _, it := range items {
+		l.itemSet[it] = struct{}{}
+		le.itemMap[it] = id
+	}
+	l.mu.Unlock()
+	return nil
+}
+
+func (le *lessor) GetLease(item LeaseItem) LeaseID {
+	le.mu.Lock()
+	defer le.mu.Unlock()
+	return le.itemMap[item]
+}
+
+// Detach detaches items from the lease with given ID.
+// If the given lease does not exist, an error will be returned.
+func (le *lessor) Detach(id LeaseID, items []LeaseItem) error {
+	le.mu.Lock()
+	defer le.mu.Unlock()
+
+	l := le.leaseMap[id]
+	if l == nil {
+		return ErrLeaseNotFound
+	}
+
+	l.mu.Lock()
+	for _, it := range items {
+		delete(l.itemSet, it)
+		delete(le.itemMap, it)
+	}
+	l.mu.Unlock()
+	return nil
+}
+
+func (le *lessor) Recover(b backend.Backend, rd RangeDeleter) {
+	le.mu.Lock()
+	defer le.mu.Unlock()
+
+	le.b = b
+	le.rd = rd
+	le.leaseMap = make(map[LeaseID]*Lease)
+	le.itemMap = make(map[LeaseItem]LeaseID)
+	le.initAndRecover()
+}
+
+func (le *lessor) ExpiredLeasesC() <-chan []*Lease {
+	return le.expiredC
+}
+
+func (le *lessor) Stop() {
+	close(le.stopC)
+	<-le.doneC
+}
+
+func (le *lessor) runLoop() {
+	defer close(le.doneC)
+
+	for {
+		le.revokeExpiredLeases()
+		le.checkpointScheduledLeases()
+
+		select {
+		case <-time.After(500 * time.Millisecond):
+		case <-le.stopC:
+			return
+		}
+	}
+}
+
+// revokeExpiredLeases finds all leases past their expiry and sends them
+// to expired channel for to be revoked.
+func (le *lessor) revokeExpiredLeases() {
+	// var ls []*Lease
+
+	// // rate limit
+	// revokeLimit := leaseRevokeRate / 2
+
+	// le.mu.Lock()
+	// if le.isPrimary() {
+	// 	ls = le.findExi
+	// }
+}
+
+// checkpointScheduledLeases finds all scheduled lease checkpoints that are due
+// and submits them to the checkpointer to persist them to the consensus log.
+func (le *lessor) checkpointScheduledLeases() {
+	// TODO
+}
+
 func (le *lessor) clearScheduledLeasesCheckpoints() {
 	le.leaseCheckpointHeap = make(LeaseQueue, 0)
 }
@@ -602,18 +689,63 @@ func (le *lessor) clearLeaseExpiredNotifier() {
 	le.leaseExpiredNotifier = newLeaseExpiredNotifier()
 }
 
-type leasesByExpiry []*Lease
+// expireExists returns true if expiry items exist
+// It pops only when expiry item exists
+// `next` is true to indicate that it ma exist in next attempt.
+func (le *lessor) expireExists() (l *Lease, ok bool, next bool) {
+	if le.leaseExpiredNotifier.Len() == 0 {
+		return nil, false, false
+	}
 
-func (le leasesByExpiry) Len() int {
-	return len(le)
+	item := le.leaseExpiredNotifier.Poll()
+	l = le.leaseMap[item.id]
+	if l == nil {
+		// lease has expired or been revoked
+		// no need to revoke (nothing is expiry)
+		le.leaseExpiredNotifier.Unregister()
+		return nil, false, true
+	}
+
+	now := time.Now()
+	if now.UnixNano() < item.time /* expiration time*/ {
+		// Candidate expirations are caught up, reinsert this item
+		// and no need to revoke (nothing is expiry)
+		return l, false, false
+	}
+
+	// recheck if revoke is complete after retry interval
+	item.time = now.Add(le.expiredLeaseRetryInterval).UnixNano()
+	le.leaseExpiredNotifier.RegisterOrUpdate(item)
+	return l, true, false
 }
 
-func (le leasesByExpiry) Less(i, j int) bool {
-	return le[i].Remaining() < le[j].Remaining()
-}
+// findExpiredLeases loop leases in the leaseMap until reaching expired limit
+// and returns the expired leases that needed to be revoked.
+func (le *lessor) findExpiredLeases(limit int) []*Lease {
+	leases := make([]*Lease, 0, 16)
 
-func (le leasesByExpiry) Swap(i, j int) {
-	le[i], le[j] = le[j], le[i]
+	for {
+		l, ok, next := le.expireExists()
+
+		if !ok {
+			if !next {
+				break
+			} else {
+				continue
+			}
+		}
+
+		if l.expired() {
+			leases = append(leases, l)
+
+			// reach expired limit
+			if len(leases) == limit {
+				break
+			}
+		}
+	}
+
+	return leases
 }
 
 func (le *lessor) scheduleCheckpointIfNeeded(lease *Lease) {
@@ -634,6 +766,20 @@ func (le *lessor) scheduleCheckpointIfNeeded(lease *Lease) {
 		id:   lease.ID,
 		time: time.Now().Add(le.checkpointInterval).UnixNano(),
 	})
+}
+
+type leasesByExpiry []*Lease
+
+func (le leasesByExpiry) Len() int {
+	return len(le)
+}
+
+func (le leasesByExpiry) Less(i, j int) bool {
+	return le[i].Remaining() < le[j].Remaining()
+}
+
+func (le leasesByExpiry) Swap(i, j int) {
+	le[i], le[j] = le[j], le[i]
 }
 
 type Lease struct {
@@ -729,24 +875,6 @@ func (l *Lease) Remaining() time.Duration {
 		return time.Duration(math.MaxInt64)
 	}
 	return time.Until(l.expiry)
-}
-
-// revokeExpiredLeases finds all leases past their expiry and sends them
-// to expired channel for to be revoked.
-func (le *lessor) revokeExpiredLeases() {
-	// TODO
-	// var ls []*Lease
-
-	// // rate limit
-	// revokeLimit := leaseRevokeRate / 2
-	// le.mu.Lock()
-	// if le.is
-}
-
-// checkpointScheduledLeases finds all scheduled lease checkpoints that are due
-// and submits them to the checkpointer to persist them to the consensus log.
-func (le *lessor) checkpointScheduledLeases() {
-	// TODO
 }
 
 type LeaseItem struct {
