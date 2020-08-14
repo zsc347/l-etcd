@@ -36,7 +36,7 @@ var (
 
 	// maximum number of lease checkpoints recorded to the consensus log per
 	// second； configurable for tests
-	leaseCheckpointRage = 1000
+	leaseCheckpointRate = 1000
 
 	// the default interval of lease checkpoint
 	defaultLeaseCheckpointInterval = 5 * time.Minute
@@ -664,21 +664,92 @@ func (le *lessor) runLoop() {
 // revokeExpiredLeases finds all leases past their expiry and sends them
 // to expired channel for to be revoked.
 func (le *lessor) revokeExpiredLeases() {
-	// var ls []*Lease
+	var ls []*Lease
 
-	// // rate limit
-	// revokeLimit := leaseRevokeRate / 2
+	// rate limit
+	revokeLimit := leaseRevokeRate / 2
+	le.mu.RLock()
+	if le.isPrimary() {
+		ls = le.findExpiredLeases(revokeLimit)
+	}
+	le.mu.RUnlock()
 
-	// le.mu.Lock()
-	// if le.isPrimary() {
-	// 	ls = le.findExi
-	// }
+	if len(ls) != 0 {
+		select {
+		case <-le.stopC:
+			return
+		case le.expiredC <- ls:
+		default:
+			// the receiver of expiredC is probably busy handling
+			// other stuff
+			// let's try this next time after 500ms
+		}
+	}
 }
 
 // checkpointScheduledLeases finds all scheduled lease checkpoints that are due
 // and submits them to the checkpointer to persist them to the consensus log.
 func (le *lessor) checkpointScheduledLeases() {
-	// TODO
+	var cps []*pb.LeaseCheckpoint
+
+	// rate limit
+	for i := 0; i < leaseCheckpointRate/2; i++ {
+		le.mu.Lock()
+		if le.isPrimary() {
+			cps = le.findDueScheduledCheckpoints(maxLeaseCheckpointBatchSize)
+		}
+		le.mu.Unlock()
+
+		if len(cps) != 0 {
+			le.cp(context.Background(), &pb.LeaseCheckpointRequest{Checkpoints: cps})
+		}
+		if len(cps) < maxLeaseCheckpointBatchSize {
+			return
+		}
+	}
+}
+
+func (le *lessor) findDueScheduledCheckpoints(checkpointLimit int) []*pb.LeaseCheckpoint {
+	if le.cp == nil {
+		return nil
+	}
+
+	now := time.Now()
+	cps := []*pb.LeaseCheckpoint{}
+	for le.leaseCheckpointHeap.Len() > 0 && len(cps) < checkpointLimit {
+		lt := le.leaseCheckpointHeap[0]
+		if lt.time /* next checkpoint time*/ > now.UnixNano() {
+			return cps
+		}
+
+		heap.Pop(&le.leaseCheckpointHeap)
+		var l *Lease
+		var ok bool
+		if l, ok = le.leaseMap[lt.id]; !ok {
+			continue
+		}
+		if !now.Before(l.expiry) {
+			continue
+		}
+
+		remainingTTL := int64(math.Ceil(l.expiry.Sub(now).Seconds()))
+		if remainingTTL >= l.ttl {
+			continue
+		}
+
+		if le.lg != nil {
+			le.lg.Debug("Checkpointing lease",
+				zap.Int64("leaseID", int64(lt.id)),
+				zap.Int64("remainingTTL", remainingTTL))
+		}
+
+		cps = append(cps, &pb.LeaseCheckpoint{
+			ID:            int64(lt.id),
+			Remaining_TTL: remainingTTL,
+		})
+	}
+
+	return cps
 }
 
 func (le *lessor) clearScheduledLeasesCheckpoints() {
@@ -885,4 +956,72 @@ func int64ToBytes(n int64) []byte {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uint64(n))
 	return bytes
+}
+
+// FakeLessor is a fake implementation of Lessor interface.
+// Used for testing only.
+type FakeLessor struct{}
+
+func (f1 *FakeLessor) SetRangeDeleter(dr RangeDeleter) {}
+
+func (f1 *FakeLessor) SetCheckPointer(cp Checkpointer) {}
+
+func (f1 *FakeLessor) Grant(id LeaseID, ttl int64) (*Lease, error) {
+	return nil, nil
+}
+
+func (f1 *FakeLessor) Revoke(id LeaseID) error {
+	return nil
+}
+
+func (f1 *FakeLessor) Checkpoint(id LeaseID, remainingTTL int64) error {
+	return nil
+}
+
+func (f1 *FakeLessor) Attach(id LeaseID, items []LeaseItem) error {
+	return nil
+}
+
+func (f1 *FakeLessor) GetLease(item LeaseItem) LeaseID {
+	return 0
+}
+
+func (f1 *FakeLessor) Detach(id LeaseID, items []LeaseItem) error {
+	return nil
+}
+
+func (f1 *FakeLessor) Promote(extend time.Duration) {}
+
+func (f1 *FakeLessor) Demote() {}
+
+func (f1 *FakeLessor) Renew(id LeaseID) (int64, error) {
+	return 10, nil
+}
+
+func (f1 *FakeLessor) Lookup(id LeaseID) *Lease {
+	return nil
+}
+
+func (f1 *FakeLessor) Leases() []*Lease {
+	return nil
+}
+
+func (f1 *FakeLessor) ExpiredLeasesC() <-chan []*Lease {
+	return nil
+}
+
+func (f1 *FakeLessor) Recover(b backend.Backend, rd RangeDeleter) {}
+
+func (f1 *FakeLessor) Stop() {}
+
+type FakeTxnDelete struct {
+	backend.BatchTx
+}
+
+func (ftd *FakeTxnDelete) DeleteRange(key, end []byte) (n, rev int64) {
+	return 0, 0
+}
+
+func (ftd *FakeTxnDelete) End() {
+	ftd.Unlock()
 }
