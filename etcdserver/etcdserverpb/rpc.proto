@@ -23,26 +23,6 @@ message ResponseHeader {
     uint64 raft_term = 4;
 }
 
-message LeaseTimeToLiveRequest {
-    // ID is the lease ID for the lease.
-    int64 ID = 1;
-    // keys is true to query all the keys attached to this lease.
-    bool keys = 2;
-}
-
-message LeaseTimeToLiveResponse {
-    ResponseHeader header = 1;
-    // ID is the lease ID from the keep alive request.
-    int64 ID = 2;
-    // TTL is the remaining TTL in seconds for the lease;
-    // the lease will expire in under TTL+1 seconds.
-    int64 TTL = 3;
-    // GrantedTTL is the initial granted time in seconds upon lease 
-    // creation/renewal.
-    int64 grantedTTL = 4;
-    // Keys is the list of keys attached to this lease.
-    repeated bytes keys = 5;
-}
 
 message LeaseCheckpoint {
     // ID is the lease ID to checkpoint.
@@ -58,4 +38,49 @@ message LeaseCheckpointRequest {
 
 message LeaseCheckpointResponse {
   ResponseHeader header = 1;
+}
+
+message LeaseKeepAliveRequest {
+  // ID is the lease ID for the lease to keep alive.
+  int64 ID = 1;
+}
+
+message LeaseKeepAliveResponse {
+  ResponseHeader header = 1;
+  // ID is the lease ID from the keep alive request.
+  int64 ID = 2;
+  // TTL is the new time-to-live for the lease.
+  int64 TTL = 3;
+}
+
+message LeaseTimeToLiveRequest {
+  // ID is the lease ID for the lease.
+  int64 ID = 1;
+  // keys is true to query all the keys attached to this lease.
+  bool keys = 2;
+}
+
+message LeaseTimeToLiveResponse {
+  ResponseHeader header = 1;
+  // ID is the lease ID from the keep alive request.
+  int64 ID = 2;
+  // TTL is the remaining TTL in seconds for the lease; the lease will expire in under TTL+1 seconds.
+  int64 TTL = 3;
+  // GrantedTTL is the initial granted time in seconds upon lease creation/renewal.
+  int64 grantedTTL = 4;
+  // Keys is the list of keys attached to this lease.
+  repeated bytes keys = 5;
+}
+
+message LeaseLeasesRequest {
+}
+
+message LeaseStatus {
+  int64 ID = 1;
+  // TODO: int64 TTL = 2;
+}
+
+message LeaseLeasesResponse {
+  ResponseHeader header = 1;
+  repeated LeaseStatus leases = 2;
 }
