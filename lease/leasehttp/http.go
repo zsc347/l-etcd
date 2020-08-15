@@ -1,14 +1,18 @@
 package leasehttp
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	"github.com/l-etcd/etcdserver/etcdserverpb"
+	pb "github.com/l-etcd/etcdserver/etcdserverpb"
 	"github.com/l-etcd/lease"
 	"github.com/l-etcd/lease/leasepb"
+	"github.com/l-etcd/pkg/httputil"
 )
 
 var (
@@ -45,7 +49,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var v []byte
 	switch r.URL.Path {
 	case LeasePrefix:
-		lreq := etcdserverpb.LeaseTimeToLiveRequest{}
+		lreq := pb.LeaseTimeToLiveRequest{}
 		if uerr := lreq.Unmarshal(b); uerr != nil {
 			http.Error(w, "error unmarshalling request", http.StatusBadRequest)
 			return
@@ -68,7 +72,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// TODO: fill out ResponseHeader
-		resp := &etcdserverpb.LeaseKeepAliveResponse{ID: lreq.ID, TTL: ttl}
+		resp := &pb.LeaseKeepAliveResponse{ID: lreq.ID, TTL: ttl}
 		v, err = resp.Marshal()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -95,8 +99,8 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		// TODO: fill out ResponseHeader
 		resp := &leasepb.LeaseInternalResponse{
-			LeaseTimeToLiveResponse: &etcdserverpb.LeaseTimeToLiveResponse{
-				Header:     &etcdserverpb.ResponseHeader{},
+			LeaseTimeToLiveResponse: &pb.LeaseTimeToLiveResponse{
+				Header:     &pb.ResponseHeader{},
 				ID:         lreq.LeaseTimeToLiveRequest.ID,
 				TTL:        int64(l.Remaining().Seconds()),
 				GrantedTTL: l.TTL(),
@@ -123,4 +127,122 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/protobuf")
 	w.Write(v)
+}
+
+// RenewHTTP renews a lease at a given primary server.
+// TODO: Batch request in future ?
+func RenewHTTP(ctx context.Context,
+	id lease.LeaseID,
+	url string,
+	rt http.RoundTripper) (int64, error) {
+
+	// will post lreq protobuf to leader
+	lreq, err := (&pb.LeaseKeepAliveRequest{ID: int64(id)}).Marshal()
+	if err != nil {
+		return -1, err
+	}
+
+	cc := &http.Client{Transport: rt}
+	req, err := http.NewRequest("POST", url, bytes.NewReader(lreq))
+	if err != nil {
+		return -1, err
+	}
+
+	req.Header.Set("Content-Type", "application/protobuf")
+	req = req.WithContext(ctx)
+
+	req.Cancel = ctx.Done()
+
+	resp, err := cc.Do(req)
+	if err != nil {
+		return -1, err
+	}
+
+	b, err := readResponse(resp)
+	if err != nil {
+		return -1, err
+	}
+
+	if resp.StatusCode == http.StatusNotFound {
+		return -1, lease.ErrLeaseNotFound
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return -1, fmt.Errorf("lease: unknown error(%s)", string(b))
+	}
+
+	lresp := &pb.LeaseKeepAliveResponse{}
+	if err := lresp.Unmarshal(b); err != nil {
+		return -1, fmt.Errorf(`lease: %v. data = "%s"`, err, string(b))
+	}
+
+	if lresp.ID != int64(id) {
+		return -1, fmt.Errorf("lease: renew id mismatch")
+	}
+	return lresp.TTL, nil
+}
+
+// TimeToLiveHTTP retrieves lease information of the given lease ID.
+func TimeToLiveHTTP(ctx context.Context,
+	id lease.LeaseID,
+	keys bool,
+	url string,
+	rt http.RoundTripper) (*leasepb.LeaseInternalResponse, error) {
+	// will post lreq protobuf to leader
+	lreq, err := (&leasepb.LeaseInternalRequest{
+		LeaseTimeToLiveRequest: &pb.LeaseTimeToLiveRequest{
+			ID:   int64(id),
+			Keys: keys,
+		},
+	}).Marshal()
+
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(lreq))
+
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/protobuf")
+
+	req = req.WithContext(ctx)
+
+	cc := &http.Client{Transport: rt}
+	var b []byte
+	// buffer errc channel so that errc don't block inside the go routine
+	resp, err := cc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	b, err = readResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusRequestTimeout {
+		return nil, ErrLeaseHTTPTimeout
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, lease.ErrLeaseNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("lease: unknown error(%s)", string(b))
+	}
+
+	lresp := &leasepb.LeaseInternalResponse{}
+	if err := lresp.Unmarshal(b); err != nil {
+		return nil, fmt.Errorf(`lease: %v. data="%s"`, err, string(b))
+	}
+	if lresp.LeaseTimeToLiveResponse.ID != int64(id) {
+		return nil, fmt.Errorf("lease: renew id mismatch")
+	}
+	return lresp, nil
+}
+
+func readResponse(resp *http.Response) (b []byte, err error) {
+	b, err = ioutil.ReadAll(resp.Body)
+	httputil.GracefulClose(resp)
+	return
 }
