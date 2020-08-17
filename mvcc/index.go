@@ -40,12 +40,12 @@ type treeIndex struct {
 	lg   *zap.Logger
 }
 
-// func newTreeIndex(lg *zap.Logger) index {
-// 	return &treeIndex{
-// 		tree: btree.New(32),
-// 		lg:   lg,
-// 	}
-// }
+func newTreeIndex(lg *zap.Logger) index {
+	return &treeIndex{
+		tree: btree.New(32),
+		lg:   lg,
+	}
+}
 
 func (ti *treeIndex) Put(key []byte, rev revision) {
 	keyi := &keyIndex{key: key}
