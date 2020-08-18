@@ -3,6 +3,37 @@ package mvcc
 import "github.com/prometheus/client_golang/prometheus"
 
 var (
+	rangeCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "mvcc",
+			Name:      "range_total",
+			Help:      "Total number of ranges seen by this member.",
+		})
+
+	putCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "mvcc",
+			Name:      "put_total",
+			Help:      "Total number of puts seen by this member.",
+		})
+
+	deleteCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "mvcc",
+			Name:      "delete_total",
+			Help:      "Total number of deletes seen by this member.",
+		})
+
+	txnCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "mvcc",
+			Name:      "txn_total",
+			Help:      "Total number of txns seen by this member.",
+		})
 	keysGuage = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: "etcd_debugging",
@@ -47,3 +78,15 @@ var (
 			Buckets: prometheus.ExponentialBuckets(0.5, 2, 14),
 		})
 )
+
+func init() {
+	prometheus.MustRegister(rangeCounter)
+	prometheus.MustRegister(putCounter)
+	prometheus.MustRegister(deleteCounter)
+	prometheus.MustRegister(txnCounter)
+	prometheus.MustRegister(keysGuage)
+
+	prometheus.MustRegister(hashSec)
+	prometheus.MustRegister(hashRevSec)
+	prometheus.MustRegister(indexCompactionPauseMs)
+}
