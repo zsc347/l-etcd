@@ -23,8 +23,7 @@ type ReadTx interface {
 	UnsafeRange(bucketName,
 		key,
 		endKey []byte,
-		limit int64) (keys [][]byte,
-		vals [][]byte)
+		limit int64) (keys [][]byte, vals [][]byte)
 	UnsafeForEach(bucketName []byte, visitor func(k, v []byte) error) error
 }
 

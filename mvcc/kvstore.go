@@ -3,13 +3,16 @@ package mvcc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"hash/crc32"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/l-etcd/etcdserver/cindex"
 	"github.com/l-etcd/lease"
 	"github.com/l-etcd/mvcc/backend"
+	"github.com/l-etcd/mvcc/mvccpb"
 	"github.com/l-etcd/pkg/schedule"
 	"github.com/l-etcd/pkg/traceutil"
 	"go.uber.org/zap"
@@ -354,10 +357,197 @@ func (s *store) Restore(b backend.Backend) error {
 	return s.restore()
 }
 
+type revKeyValue struct {
+	key  []byte
+	kv   mvccpb.KeyValue
+	kstr string
+}
+
+func restoreIntoIndex(lg *zap.Logger, idx index) (chan<- revKeyValue, <-chan int64) {
+	rkvc, revc := make(chan revKeyValue, restoreChunkKeys), make(chan int64, 1)
+	go func() {
+		currentRev := int64(1)
+		defer func() { revc <- currentRev }()
+
+		// restore the tree index from streaming the unordered index.
+		kiCache := make(map[string]*keyIndex, restoreChunkKeys)
+		for rkv := range rkvc {
+			ki, ok := kiCache[rkv.kstr]
+
+			// purge kiCache if many keys but still missing in the cache
+			if !ok && len(kiCache) >= restoreChunkKeys {
+				i := 10
+				for k := range kiCache {
+					delete(kiCache, k)
+					if i--; i == 0 {
+						break
+					}
+				}
+			}
+
+			// cache miss, fetch from tee index if there
+			if !ok {
+				ki = &keyIndex{key: rkv.kv.Key}
+				if idxKey := idx.KeyIndex(ki); idxKey != nil {
+					kiCache[rkv.kstr], ki = idxKey, idxKey
+					ok = true
+				}
+			}
+
+			rev := bytesToRev(rkv.key)
+			currentRev = rev.main
+			if ok {
+				if isTombstone(rkv.key) {
+					if err := ki.tombstone(lg, rev.main, rev.sub); err != nil {
+						lg.Warn("tombstone encountered error", zap.Error(err))
+					}
+					continue
+				}
+				ki.put(lg, rev.main, rev.sub)
+			} else if !isTombstone(rkv.key) {
+				ki.restore(lg, revision{rkv.kv.CreateRevision, 0}, rev, rkv.kv.Version)
+				idx.Insert(ki)
+				kiCache[rkv.kstr] = ki
+			}
+		}
+	}()
+	return rkvc, revc
+}
+
+func restoreChunk(lg *zap.Logger,
+	kvc chan<- revKeyValue, // output chan
+	keys, vals [][]byte,
+	keyToLease map[string]lease.LeaseID, // output map
+) {
+	for i, key := range keys {
+		// --- from key get val
+		// --- from val get key, key str, and kv
+		rkv := revKeyValue{key: key}
+		if err := rkv.kv.Unmarshal(vals[i]); err != nil {
+			lg.Fatal("failed to unmarshal mvccpb.KeyValue", zap.Error(err))
+		}
+		rkv.kstr = string(rkv.kv.Key)
+
+		if isTombstone(rkv.kv.Key) {
+			delete(keyToLease, rkv.kstr)
+		} else if lid := lease.LeaseID(rkv.kv.Lease); lid != lease.NoLease {
+			keyToLease[rkv.kstr] = lid
+		} else {
+			delete(keyToLease, rkv.kstr)
+		}
+		kvc <- rkv
+	}
+}
+
+func (s *store) Close() error {
+	close(s.stopc)
+	s.fifoSched.Stop()
+	return nil
+}
+
 func (s *store) restore() error {
 	s.setupMetricsReporter()
 
-	// TODO
+	min, max := newRevBytes(), newRevBytes()
+
+	revToBytes(revision{main: 1}, min)
+	revToBytes(revision{main: math.MaxInt64, sub: math.MaxInt64}, max)
+
+	keyToLease := make(map[string]lease.LeaseID)
+
+	// restore index
+
+	// --- compact main key
+	tx := s.b.BatchTx()
+	tx.Lock()
+
+	_, finishedCompactBytes := tx.UnsafeRange(metaBucketName,
+		finishedCompactKeyName,
+		nil,
+		0)
+	if len(finishedCompactBytes) != 0 {
+		s.compactMainRev = bytesToRev(finishedCompactBytes[0]).main
+		s.lg.Info("restored last compact revision",
+			zap.String("meta-bucket-name", string(metaBucketName)),
+			zap.String("meta-bucket-name-key", string(finishedCompactKeyName)),
+			zap.Int64("restored-compact-revision", s.compactMainRev))
+	}
+
+	// index keys concurrently as they're loaded in from tx
+	keysGuage.Set(0)
+	rkvc, revc := restoreIntoIndex(s.lg, s.kvindex)
+
+	for {
+		keys, vals := tx.UnsafeRange(keyBucketName,
+			min,
+			max,
+			int64(restoreChunkKeys))
+		if len(keys) == 0 {
+			break
+		}
+		// rkvc blocks if the total pending keys exceeds the restore
+		// chunk size to keep keys from consuming too much memory
+		restoreChunk(s.lg, rkvc, keys, vals, keyToLease)
+
+		if len(keys) < restoreChunkKeys {
+			// partial set implies final set
+			break
+		}
+
+		// next set begins after where this one ended
+		newMin := bytesToRev(keys[len(keys)-1][:revBytesLen])
+
+		newMin.sub++
+		revToBytes(newMin, min)
+	}
+	close(rkvc)
+
+	s.currentRev = <-revc
+
+	// keys in the range [compacted revision -N, compaction] might all be deleted due to compaction.
+	// the correct revisio should be set to compaction revision in the case, not the largest revision
+	// we have seen
+	if s.currentRev < s.compactMainRev {
+		s.currentRev = s.compactMainRev
+	}
+
+	_, scheduledCompactBytes := tx.UnsafeRange(metaBucketName,
+		scheduledCompactKeyName, nil, 0)
+	scheduledCompact := int64(0)
+
+	if len(scheduledCompactBytes) != 0 {
+		scheduledCompact = bytesToRev(scheduledCompactBytes[0]).main
+	}
+
+	if scheduledCompact <= s.compactMainRev {
+		scheduledCompact = 0
+	}
+
+	for key, lid := range keyToLease {
+		if s.le == nil {
+			tx.Unlock()
+			panic("no lessor to attach lease")
+		}
+		err := s.le.Attach(lid, []lease.LeaseItem{{Key: key}})
+		if err != nil {
+			s.lg.Error("failed to attach a lease",
+				zap.String("lease-id", fmt.Sprintf("%016x", lid)),
+				zap.Error(err))
+		}
+	}
+	tx.Unlock()
+
+	if scheduledCompact != 0 {
+		if _, err := s.compactLockfree(scheduledCompact); err != nil {
+			s.lg.Warn("compaction encountered error", zap.Error(err))
+		}
+
+		s.lg.Info("resume scheduled compaction",
+			zap.String("meta-bucket-name", string(metaBucketName)),
+			zap.String("meta-bucket-name-key", string(scheduledCompactKeyName)),
+			zap.Int64("scheduled-compact-revision", scheduledCompact))
+	}
+
 	return nil
 }
 
